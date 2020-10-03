@@ -21,7 +21,7 @@ import numpy as np
 from PySide2.QtCore import Signal, Qt, Slot
 from PySide2.QtGui import QMouseEvent, QImage, QPixmap, QColor
 from PySide2.QtWidgets import QLabel, QWidget, QVBoxLayout, QGroupBox, QSlider, QButtonGroup, \
-    QRadioButton
+    QRadioButton, QSizePolicy
 
 
 @dataclass(frozen=True)
@@ -40,16 +40,19 @@ class MatView(QLabel):
         super().__init__(parent)
         self.__current_rgb_mat: Optional[np.ndarray] = None
         self.setMouseTracking(True)
+        self.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
 
     def mouseMoveEvent(self, event: QMouseEvent):
         super().mouseMoveEvent(event)
         if self.__current_rgb_mat is not None:
             x = event.x()
             y = event.y()
-            img = self.pixmap().toImage()
-            if x < img.width() and y < img.height():
-                color: QColor = img.pixelColor(x, y)
-                self.position_info.emit(MatViewPosInfo(x, y, color.red(), color.green(), color.blue()))
+            h, w, _ = self.__current_rgb_mat.shape
+            if x < w and y < h:
+                self.position_info.emit(MatViewPosInfo(x, y,
+                                                       red=self.__current_rgb_mat[y][x][0],
+                                                       green=self.__current_rgb_mat[y][x][1],
+                                                       blue=self.__current_rgb_mat[y][x][2]))
 
 
     def render_bgr_mat(self, mat: np.ndarray):

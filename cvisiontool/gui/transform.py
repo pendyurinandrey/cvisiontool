@@ -18,10 +18,30 @@ from typing import Optional
 import cv2.cv2 as cv
 import numpy as np
 from PySide2.QtCore import Signal, Slot
-from PySide2.QtWidgets import QWidget, QGridLayout
+from PySide2.QtWidgets import QWidget, QGridLayout, QDialog, QVBoxLayout
 
 from cvisiontool.gui.common import ChooseOneOfWidget, SliderWidget
 
+
+class ErosionAndDilationDialog(QDialog):
+    image_ready = Signal(np.ndarray)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.__layout = QVBoxLayout()
+        self.__widget = ErodeAndDilateWidget(self)
+        self.__layout.addWidget(self.__widget)
+        self.setLayout(self.__layout)
+        self.setWindowTitle('Erosion and Dilation parameters')
+        self.__widget.image_ready.connect(self.__image_ready)
+
+    @Slot(np.ndarray)
+    def __image_ready(self, mat: np.ndarray):
+        self.image_ready.emit(mat)
+
+    @Slot(np.ndarray)
+    def set_image(self, mat: np.ndarray):
+        self.__widget.set_image(mat)
 
 class ErodeAndDilateWidget(QWidget):
     image_ready = Signal(np.ndarray)
