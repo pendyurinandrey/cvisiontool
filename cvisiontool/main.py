@@ -17,7 +17,7 @@
 import sys
 from PySide2.QtWidgets import QApplication
 
-from cvisiontool.gui.mainwidget import MainWindow
+from cvisiontool.gui.mainwindow import MainWindow
 
 app = QApplication(sys.argv)
 

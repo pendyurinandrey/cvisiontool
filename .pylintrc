@@ -1,0 +1,8 @@
+[MASTER]
+extension-pkg-whitelist=PySide2,cv2
+
+[MESSAGES CONTROL]
+disable=R,C,unused-argument
+
+[TYPECHECK]
+ignored-modules=PySide2

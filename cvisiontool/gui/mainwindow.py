@@ -17,13 +17,12 @@ import cv2.cv2 as cv
 from pathlib import Path
 import numpy as np
 from PySide2.QtCore import Slot, Signal
-from PySide2.QtGui import QColor
 from PySide2.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QAction, QFileDialog, QLabel, \
     QDialog
 
 from cvisiontool.gui.common import MatView, MatViewPosInfo
 from cvisiontool.gui.history import HistoryDialog, global_history_manager, HistoryEntry
-from cvisiontool.gui.transform import ErosionAndDilationDialog
+from cvisiontool.gui.transform import ErosionAndDilationDialog, InRangeDialog
 
 
 class MainWindow(QMainWindow):
@@ -36,6 +35,8 @@ class MainWindow(QMainWindow):
         self.__history_dialog: QDialog = None
         self.__current_dialog: QDialog = None
         self.__mat_view: MatView = MatView()
+        self.__mat_view.setFixedHeight(self.height() - 30)
+        self.__mat_view.setFixedWidth(self.width() - 30)
         self.__mat_view.position_info.connect(self.__render_view_position_info)
         self.__central_widget = QWidget()
         self.__status_label = QLabel()
@@ -64,10 +65,19 @@ class MainWindow(QMainWindow):
         history_action.triggered.connect(self.__show_history_dialog)
         view_menu.addAction(history_action)
 
-        transform_menu = menu.addMenu('Transform')
+        self.__transform_menu = menu.addMenu('Transform')
         erosion_and_dilation_action = QAction(text='Erosion and Dilation', parent=menu)
         erosion_and_dilation_action.triggered.connect(self.__open_er_di_dialog)
-        transform_menu.addAction(erosion_and_dilation_action)
+        self.__transform_menu.addAction(erosion_and_dilation_action)
+
+        thresholding_menu = self.__transform_menu.addMenu('Thresholding')
+        in_range_action_action = QAction('inRange', parent=thresholding_menu)
+        in_range_action_action.triggered.connect(self.__show_in_range_dialog)
+        thresholding_menu.addAction(in_range_action_action)
+        self.__transform_menu.setEnabled(False)
+
+    def __activate_menu_on_image_load(self):
+        self.__transform_menu.setEnabled(True)
 
     @Slot()
     def __load_file(self):
@@ -75,12 +85,13 @@ class MainWindow(QMainWindow):
                                                        self.__lasted_chosen_dir)
         if selected_file is not None:
             path = Path(selected_file)
-            self.__lasted_chosen_dir = str(Path(selected_file).parent)
+            self.__lasted_chosen_dir = str(path.parent)
             self.__current_mat_bgr = cv.imread(selected_file)
             self.__mat_view.render_bgr_mat(self.__current_mat_bgr)
             self.image_loaded.emit(self.__current_mat_bgr)
             global_history_manager.add_entry(
                 HistoryEntry(f'Image loaded: {selected_file}', self.__current_mat_bgr))
+            self.__activate_menu_on_image_load()
 
     @Slot()
     def __show_history_dialog(self):
@@ -93,12 +104,29 @@ class MainWindow(QMainWindow):
 
     @Slot()
     def __open_er_di_dialog(self):
+        # TODO: It's necessary to close a dialog gracefully
         if self.__current_dialog is not None:
             self.__current_dialog.close()
 
         self.__current_dialog = ErosionAndDilationDialog(self)
-        self.__current_dialog.image_ready.connect(self.render_image)
+        self.__current_dialog.show_image.connect(self.show_image)
+        self.__current_dialog.apply_image.connect(self.apply_image)
+        self.__current_dialog.revert_image.connect(self.revert_image)
         self.image_loaded.connect(self.__current_dialog.set_image)
+        if self.__current_mat_bgr is not None:
+            self.image_loaded.emit(self.__current_mat_bgr)
+        self.__current_dialog.show()
+
+    @Slot()
+    def __show_in_range_dialog(self):
+        # TODO: It's necessary to close a dialog gracefully
+        if self.__current_dialog is not None:
+            self.__current_dialog.close()
+
+        self.__current_dialog = InRangeDialog()
+        self.__current_dialog.show_image.connect(self.show_image)
+        self.__current_dialog.apply_image.connect(self.apply_image)
+        self.__current_dialog.revert_image.connect(self.revert_image)
         if self.__current_mat_bgr is not None:
             self.__current_dialog.set_image(self.__current_mat_bgr)
         self.__current_dialog.show()
@@ -115,5 +143,14 @@ class MainWindow(QMainWindow):
             f'HSV (Open CV format): [h = {h}, s = {s}, v={v}]')
 
     @Slot(np.ndarray)
-    def render_image(self, image_bgr: np.ndarray):
+    def show_image(self, image_bgr: np.ndarray):
         self.__mat_view.render_bgr_mat(image_bgr)
+
+    @Slot(np.ndarray)
+    def apply_image(self, image_bgr: np.ndarray):
+        self.__current_mat_bgr = image_bgr
+        self.show_image(image_bgr)
+
+    @Slot()
+    def revert_image(self):
+        self.show_image(self.__current_mat_bgr)

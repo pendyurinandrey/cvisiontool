@@ -69,7 +69,7 @@ class HistoryDialog(QDialog):
         self.__fill_history()
 
     def __fill_history(self):
-        for index, entry in global_history_manager.get_entries().items():
+        for entry in global_history_manager.get_entries().values():
             self.__list_widget.addItem(entry.description)
 
     @Slot()

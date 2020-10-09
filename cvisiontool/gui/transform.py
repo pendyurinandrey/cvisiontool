@@ -17,62 +17,43 @@ from typing import Optional
 
 import cv2.cv2 as cv
 import numpy as np
-from PySide2.QtCore import Signal, Slot
-from PySide2.QtWidgets import QWidget, QGridLayout, QDialog, QVBoxLayout
+from PySide2.QtCore import Slot
+from PySide2.QtGui import QColor
+from PySide2.QtWidgets import QWidget, QGridLayout, QCheckBox
 
-from cvisiontool.gui.common import ChooseOneOfWidget, SliderWidget
+from cvisiontool.gui.common import ChooseOneOfWidget, SliderWidget, MinimalColorPickerWidget, \
+    SupportedColorSpaces, AbstractMatActionDialog
 
 
-class ErosionAndDilationDialog(QDialog):
-    image_ready = Signal(np.ndarray)
+class ErosionAndDilationDialog(AbstractMatActionDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.__layout = QVBoxLayout()
-        self.__widget = ErodeAndDilateWidget(self)
-        self.__layout.addWidget(self.__widget)
-        self.setLayout(self.__layout)
         self.setWindowTitle('Erosion and Dilation parameters')
-        self.__widget.image_ready.connect(self.__image_ready)
 
-    @Slot(np.ndarray)
-    def __image_ready(self, mat: np.ndarray):
-        self.image_ready.emit(mat)
-
-    @Slot(np.ndarray)
-    def set_image(self, mat: np.ndarray):
-        self.__widget.set_image(mat)
-
-class ErodeAndDilateWidget(QWidget):
-    image_ready = Signal(np.ndarray)
-
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.__current_image: np.ndarray = None
-        self.__create_controls()
-
-    def __create_controls(self):
-        controls_layout = QGridLayout()
-        self.__morph_op = ChooseOneOfWidget('Morph operation',
+    def _create_main_widget(self) -> QWidget:
+        self.__main_widget = QWidget()
+        self.__main_widget_layout = QGridLayout(self.__main_widget)
+        self.__morph_op = ChooseOneOfWidget('Morphological operation',
                                             {
                                                 0: 'Erode',
                                                 1: 'Dilate'
-                                            },
-                                            self.__apply_morph)
-        controls_layout.addWidget(self.__morph_op, 0, 0)
-        self.__morph_type = ChooseOneOfWidget('Morph operation type',
+                                            })
+        self.__morph_op.toggled.connect(self.__apply_morph)
+        self.__main_widget_layout.addWidget(self.__morph_op, 0, 0)
+        self.__morph_type = ChooseOneOfWidget('Morphological operation type',
                                               {
                                                   cv.MORPH_RECT: 'Rect',
                                                   cv.MORPH_CROSS: 'Cross',
                                                   cv.MORPH_ELLIPSE: 'Ellipse'
-                                              },
-                                              self.__apply_morph
-                                              )
-        controls_layout.addWidget(self.__morph_type, 1, 0)
-        self.__kernel_size_slider = SliderWidget('Kernel size', 0, 40)
+                                              })
+        self.__morph_type.toggled.connect(self.__apply_morph)
+        self.__main_widget_layout.addWidget(self.__morph_type, 1, 0)
+        self.__kernel_size_slider = SliderWidget('Anchor (Kernel size = 2*Anchor+1)', 0, 40)
         self.__kernel_size_slider.value_changed.connect(self.__apply_kernel_size)
-        controls_layout.addWidget(self.__kernel_size_slider, 0, 1)
-        self.setLayout(controls_layout)
+        self.__main_widget_layout.addWidget(self.__kernel_size_slider, 0, 1)
+
+        return self.__main_widget
 
     @Slot(int, bool)
     def __apply_morph(self, index, is_checked):
@@ -102,18 +83,84 @@ class ErodeAndDilateWidget(QWidget):
         morph_type = self.__morph_type.get_checked()
         kernel_size = self.__kernel_size_slider.get_current_value()
         if morph_type == -1 or morph_op == -1:
-            return self.__current_image
+            return self._original_mat_bgr
 
         if morph_op == 0:
-            return self.__apply_erosion(self.__current_image, kernel_size, morph_type)
+            return self.__apply_erosion(self._original_mat_bgr, kernel_size, morph_type)
         elif morph_op == 1:
-            return self.__apply_dilation(self.__current_image, kernel_size, morph_type)
+            return self.__apply_dilation(self._original_mat_bgr, kernel_size, morph_type)
 
     def __transform_and_emit_as_rgb(self):
         img_bgr = self.__transform()
         if img_bgr is not None:
-            self.image_ready.emit(img_bgr)
+            self._transformed_mat_bgr = img_bgr
+            self.show_image.emit(img_bgr)
 
-    def set_image(self, img: np.ndarray):
-        self.__current_image = img
-        self.__transform_and_emit_as_rgb()
+
+class InRangeDialog(AbstractMatActionDialog):
+
+    def _create_main_widget(self) -> QWidget:
+        self.__current_left_boundary: Optional[QColor] = None
+        self.__current_right_boundary: Optional[QColor] = None
+        self.__supported_color_spaces = {
+            0: 'HSV'
+        }
+        self.__chosen_color_space_index: int = 0
+
+        self.__main_widget = QWidget()
+        self.__main_widget_layout = QGridLayout(self.__main_widget)
+
+        self.__color_space_widget = ChooseOneOfWidget('Color-space', self.__supported_color_spaces,
+                                                      checked_index=self.__chosen_color_space_index)
+        self.__main_widget_layout.addWidget(self.__color_space_widget, 0, 0)
+        self.__show_im_cb = QCheckBox('Show result immediately', self)
+        self.__main_widget_layout.addWidget(self.__show_im_cb, 0, 1)
+        self.__left_boundary_picker = MinimalColorPickerWidget(SupportedColorSpaces.HSV,
+                                                               'Select left boundary')
+        self.__left_boundary_picker.color_changed.connect(self.__set_left_boundary)
+        self.__right_boundary_picker = MinimalColorPickerWidget(SupportedColorSpaces.HSV,
+                                                                'Select right boundary')
+        self.__right_boundary_picker.color_changed.connect(self.__set_right_boundary)
+        self.__main_widget_layout.addWidget(self.__left_boundary_picker, 1, 0)
+        self.__main_widget_layout.addWidget(self.__right_boundary_picker, 1, 1)
+
+        return self.__main_widget
+
+    def __apply_in_range(self):
+        if self._original_mat_bgr is None or self.__current_right_boundary is None \
+                or self.__current_left_boundary is None:
+            return None
+
+        mat = None
+        lower_boundary = []
+        upper_boundary = []
+        if self.__color_space_widget.get_checked() == 0:
+            mat = cv.cvtColor(self._original_mat_bgr, cv.COLOR_BGR2HSV)
+            h, s, v = self.__current_left_boundary.hue(), \
+                      self.__current_left_boundary.saturation(), \
+                      self.__current_left_boundary.value()
+            lower_boundary = np.array([int(h / 2), s, v])
+            h, s, v = self.__current_right_boundary.hue(), \
+                      self.__current_right_boundary.saturation(), \
+                      self.__current_right_boundary.value()
+            upper_boundary = np.array([int(h / 2), s, v])
+
+        self._transformed_mat_bgr = cv.inRange(mat, lower_boundary, upper_boundary)
+        self.show_image.emit(self._transformed_mat_bgr)
+
+    @Slot(QColor)
+    def __set_left_boundary(self, color: QColor):
+        self.__current_left_boundary = color
+        if self.__show_im_cb.isChecked():
+            self.__apply_in_range()
+
+    @Slot(QColor)
+    def __set_right_boundary(self, color: QColor):
+        self.__current_right_boundary = color
+        if self.__show_im_cb.isChecked():
+            self.__apply_in_range()
+
+    @Slot(int, bool)
+    def __select_bound_toggled(self, index: int, checked: bool):
+        if checked:
+            self.__chosen_color_space_index = index
