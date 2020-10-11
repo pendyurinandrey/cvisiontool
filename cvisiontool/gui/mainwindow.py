@@ -20,6 +20,8 @@ from PySide2.QtCore import Slot, Signal
 from PySide2.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QAction, QFileDialog, QLabel, \
     QDialog
 
+from cvisiontool.core.actions import Action
+from cvisiontool.core.aproc import ActionProcessor
 from cvisiontool.gui.common import MatView, MatViewPosInfo
 from cvisiontool.gui.history import HistoryDialog, global_history_manager, HistoryEntry
 from cvisiontool.gui.transform import ErosionAndDilationDialog, InRangeDialog
@@ -30,6 +32,7 @@ class MainWindow(QMainWindow):
 
     def __init__(self):
         super().__init__()
+        self.__action_processor = ActionProcessor()
         self.__lasted_chosen_dir = None
         self.__current_mat_bgr: np.ndarray = None
         self.__history_dialog: QDialog = None
@@ -109,12 +112,7 @@ class MainWindow(QMainWindow):
             self.__current_dialog.close()
 
         self.__current_dialog = ErosionAndDilationDialog(self)
-        self.__current_dialog.show_image.connect(self.show_image)
-        self.__current_dialog.apply_image.connect(self.apply_image)
-        self.__current_dialog.revert_image.connect(self.revert_image)
-        self.image_loaded.connect(self.__current_dialog.set_image)
-        if self.__current_mat_bgr is not None:
-            self.image_loaded.emit(self.__current_mat_bgr)
+        self.__connect_current_dialog()
         self.__current_dialog.show()
 
     @Slot()
@@ -124,11 +122,7 @@ class MainWindow(QMainWindow):
             self.__current_dialog.close()
 
         self.__current_dialog = InRangeDialog()
-        self.__current_dialog.show_image.connect(self.show_image)
-        self.__current_dialog.apply_image.connect(self.apply_image)
-        self.__current_dialog.revert_image.connect(self.revert_image)
-        if self.__current_mat_bgr is not None:
-            self.__current_dialog.set_image(self.__current_mat_bgr)
+        self.__connect_current_dialog()
         self.__current_dialog.show()
 
     @Slot(MatViewPosInfo)
@@ -142,15 +136,21 @@ class MainWindow(QMainWindow):
             f'x = {info.x}, y = {info.y}, RGB: [r = {info.red}, g = {info.green}, b = {info.blue}], '
             f'HSV (Open CV format): [h = {h}, s = {s}, v={v}]')
 
-    @Slot(np.ndarray)
-    def show_image(self, image_bgr: np.ndarray):
+    @Slot(Action)
+    def display_action_result(self, action: Action):
+        image_bgr = self.__action_processor.process(action, self.__current_mat_bgr)
         self.__mat_view.render_bgr_mat(image_bgr)
 
-    @Slot(np.ndarray)
-    def apply_image(self, image_bgr: np.ndarray):
-        self.__current_mat_bgr = image_bgr
-        self.show_image(image_bgr)
+    @Slot(Action)
+    def apply_action_result(self, action: Action):
+        self.__current_mat_bgr = self.__action_processor.process(action, self.__current_mat_bgr)
+        self.__mat_view.render_bgr_mat(self.__current_mat_bgr)
 
     @Slot()
-    def revert_image(self):
-        self.show_image(self.__current_mat_bgr)
+    def discard_non_applied_changes(self):
+        self.__mat_view.render_bgr_mat(self.__current_mat_bgr)
+
+    def __connect_current_dialog(self):
+        self.__current_dialog.display_action_result.connect(self.display_action_result)
+        self.__current_dialog.apply_action_result.connect(self.apply_action_result)
+        self.__current_dialog.discard_action_result.connect(self.discard_non_applied_changes)

@@ -26,6 +26,8 @@ from PySide2.QtWidgets import QLabel, QWidget, QVBoxLayout, QGroupBox, QSlider, 
     QRadioButton, QSizePolicy, QColorDialog, QHBoxLayout, QSpinBox, QFormLayout, QPushButton, \
     QDialog
 
+from cvisiontool.core.actions import Action
+
 
 @dataclass(frozen=True)
 class MatViewPosInfo:
@@ -189,10 +191,10 @@ class MinimalColorPickerWidget(QWidget):
         self.__color_3_sb.valueChanged.connect(self.__on_value_changed)
 
         if color_space == SupportedColorSpaces.HSV:
-            color_1_label.setText('H')
-            color_2_label.setText('S')
-            color_3_label.setText('V')
-            self.__color_1_sb.setRange(0, 360)
+            color_1_label.setText('H (0-359)')
+            color_2_label.setText('S (0-255)')
+            color_3_label.setText('V (0-255)')
+            self.__color_1_sb.setRange(0, 359)
             self.__color_2_sb.setRange(0, 255)
             self.__color_3_sb.setRange(0, 255)
 
@@ -241,18 +243,18 @@ class MinimalColorPickerWidget(QWidget):
         color = QColorDialog.getColor(initial=self.__resolve_current_color(),
                                       parent=self,
                                       title='Select color')
-        self.__set_current_color(color)
+        if color.isValid():
+            self.__set_current_color(color)
 
 
 class AbstractMatActionDialog(QDialog):
-    show_image = Signal(np.ndarray)
-    apply_image = Signal(np.ndarray)
-    revert_image = Signal()
+    display_action_result = Signal(Action)
+    apply_action_result = Signal(Action)
+    discard_action_result = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._transformed_mat_bgr: Optional[np.ndarray] = None
-        self._original_mat_bgr: Optional[np.ndarray] = None
+        self._current_action: Optional[Action] = None
         self.__is_applied: bool = False
 
         main_layout = QVBoxLayout(self)
@@ -274,17 +276,14 @@ class AbstractMatActionDialog(QDialog):
         pass
 
     def hideEvent(self, event: QHideEvent):
-        if self._transformed_mat_bgr is not None and not self.__is_applied:
-            self.revert_image.emit()
+        if self._current_action is not None and not self.__is_applied:
+            self.discard_action_result.emit()
 
     def _on_apply_clicked(self):
-        if self._transformed_mat_bgr is not None:
-            self.apply_image.emit(self._transformed_mat_bgr)
+        if self._current_action is not None:
+            self.apply_action_result.emit(self._current_action)
         self.__is_applied = True
         self.close()
 
     def _on_revert_clicked(self):
-        self.revert_image.emit()
-
-    def set_image(self, mat_bgr: np.ndarray):
-        self._original_mat_bgr = mat_bgr
+        self.discard_action_result.emit()

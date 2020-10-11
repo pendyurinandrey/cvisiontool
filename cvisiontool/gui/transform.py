@@ -16,11 +16,11 @@
 from typing import Optional
 
 import cv2.cv2 as cv
-import numpy as np
 from PySide2.QtCore import Slot
 from PySide2.QtGui import QColor
 from PySide2.QtWidgets import QWidget, QGridLayout, QCheckBox
 
+from cvisiontool.core.actions import ActionFactory
 from cvisiontool.gui.common import ChooseOneOfWidget, SliderWidget, MinimalColorPickerWidget, \
     SupportedColorSpaces, AbstractMatActionDialog
 
@@ -37,11 +37,12 @@ class ErosionAndDilationDialog(AbstractMatActionDialog):
         self.__morph_op = ChooseOneOfWidget('Morphological operation',
                                             {
                                                 0: 'Erode',
-                                                1: 'Dilate'
+                                                1: 'Dilate',
+                                                2: 'Morphological gradient'
                                             })
         self.__morph_op.toggled.connect(self.__apply_morph)
         self.__main_widget_layout.addWidget(self.__morph_op, 0, 0)
-        self.__morph_type = ChooseOneOfWidget('Morphological operation type',
+        self.__morph_type = ChooseOneOfWidget('Shape',
                                               {
                                                   cv.MORPH_RECT: 'Rect',
                                                   cv.MORPH_CROSS: 'Cross',
@@ -58,43 +59,29 @@ class ErosionAndDilationDialog(AbstractMatActionDialog):
     @Slot(int, bool)
     def __apply_morph(self, index, is_checked):
         if is_checked:
-            self.__transform_and_emit_as_rgb()
+            self.__transform_and_emit()
 
     @Slot(int)
-    def __apply_kernel_size(self, new_value: int):
-        self.__transform_and_emit_as_rgb()
+    def __apply_kernel_size(self):
+        self.__transform_and_emit()
 
-    def __apply_erosion(self, img: np.ndarray, erosion_size: int, erosion_type: int) -> np.ndarray:
-        ksize = 2 * erosion_size + 1
-        element = cv.getStructuringElement(erosion_type,
-                                           (ksize, ksize),
-                                           (erosion_size, erosion_size))
-        return cv.erode(img, element)
-
-    def __apply_dilation(self, img: np.ndarray, erosion_size: int, erosion_type: int) -> np.ndarray:
-        ksize = 2 * erosion_size + 1
-        element = cv.getStructuringElement(erosion_type,
-                                           (ksize, ksize),
-                                           (erosion_size, erosion_size))
-        return cv.dilate(img, element)
-
-    def __transform(self) -> Optional[np.ndarray]:
+    def __transform_and_emit(self):
         morph_op = self.__morph_op.get_checked()
-        morph_type = self.__morph_type.get_checked()
-        kernel_size = self.__kernel_size_slider.get_current_value()
-        if morph_type == -1 or morph_op == -1:
-            return self._original_mat_bgr
-
+        shape = self.__morph_type.get_checked()
+        anchor = self.__kernel_size_slider.get_current_value()
+        if shape == -1 or morph_op == -1:
+            return
+        action = None
         if morph_op == 0:
-            return self.__apply_erosion(self._original_mat_bgr, kernel_size, morph_type)
+            action = ActionFactory.create_erosion_action(shape, anchor)
         elif morph_op == 1:
-            return self.__apply_dilation(self._original_mat_bgr, kernel_size, morph_type)
+            action = ActionFactory.create_dilation_action(shape, anchor)
+        elif morph_op == 2:
+            action = ActionFactory.create_morph_gradient_action(shape, anchor)
 
-    def __transform_and_emit_as_rgb(self):
-        img_bgr = self.__transform()
-        if img_bgr is not None:
-            self._transformed_mat_bgr = img_bgr
-            self.show_image.emit(img_bgr)
+        if action is not None:
+            self._current_action = action
+            self.display_action_result.emit(action)
 
 
 class InRangeDialog(AbstractMatActionDialog):
@@ -127,26 +114,26 @@ class InRangeDialog(AbstractMatActionDialog):
         return self.__main_widget
 
     def __apply_in_range(self):
-        if self._original_mat_bgr is None or self.__current_right_boundary is None \
-                or self.__current_left_boundary is None:
+        if self.__current_right_boundary is None or self.__current_left_boundary is None:
             return None
 
-        mat = None
         lower_boundary = []
         upper_boundary = []
         if self.__color_space_widget.get_checked() == 0:
-            mat = cv.cvtColor(self._original_mat_bgr, cv.COLOR_BGR2HSV)
             h, s, v = self.__current_left_boundary.hue(), \
                       self.__current_left_boundary.saturation(), \
                       self.__current_left_boundary.value()
-            lower_boundary = np.array([int(h / 2), s, v])
+            lower_boundary = [int(h / 2), s, v]
             h, s, v = self.__current_right_boundary.hue(), \
                       self.__current_right_boundary.saturation(), \
                       self.__current_right_boundary.value()
-            upper_boundary = np.array([int(h / 2), s, v])
+            upper_boundary = [int(h / 2), s, v]
 
-        self._transformed_mat_bgr = cv.inRange(mat, lower_boundary, upper_boundary)
-        self.show_image.emit(self._transformed_mat_bgr)
+        action = ActionFactory.create_in_range_action(
+            self.__supported_color_spaces[self.__color_space_widget.get_checked()].lower(),
+            lower_boundary, upper_boundary)
+        self._current_action = action
+        self.display_action_result.emit(action)
 
     @Slot(QColor)
     def __set_left_boundary(self, color: QColor):
