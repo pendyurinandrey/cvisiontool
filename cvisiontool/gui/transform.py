@@ -38,7 +38,9 @@ class ErosionAndDilationDialog(AbstractMatActionDialog):
                                             {
                                                 0: 'Erode',
                                                 1: 'Dilate',
-                                                2: 'Morphological gradient'
+                                                2: 'Morphological gradient',
+                                                3: 'Opening: dilate(erode(src))',
+                                                4: 'Closing: erode(dilate(src))'
                                             })
         self.__morph_op.toggled.connect(self.__apply_morph)
         self.__main_widget_layout.addWidget(self.__morph_op, 0, 0)
@@ -78,6 +80,10 @@ class ErosionAndDilationDialog(AbstractMatActionDialog):
             action = ActionFactory.create_dilation_action(shape, anchor)
         elif morph_op == 2:
             action = ActionFactory.create_morph_gradient_action(shape, anchor)
+        elif morph_op == 3:
+            action = ActionFactory.create_morph_opening_action(shape, anchor)
+        elif morph_op == 4:
+            action = ActionFactory.create_morph_closing_action(shape, anchor)
 
         if action is not None:
             self._current_action = action

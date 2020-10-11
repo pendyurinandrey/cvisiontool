@@ -24,6 +24,8 @@ class ActionType(Enum):
     EROSION = 'erosion'
     DILATION = 'dilation'
     MORPH_GRADIENT = 'morphological_gradient'
+    MORPH_OPENING = 'morphological_opening'
+    MORPH_CLOSING = 'morphological_closing'
     IN_RANGE = 'in_range'
 
 
@@ -65,6 +67,20 @@ class ActionFactory(ABC):
         })
 
     @staticmethod
+    def create_morph_opening_action(shape: int, anchor: int):
+        return Action(ActionType.MORPH_OPENING, {
+            'shape': shape,
+            'anchor': anchor
+        })
+
+    @staticmethod
+    def create_morph_closing_action(shape: int, anchor: int):
+        return Action(ActionType.MORPH_CLOSING, {
+            'shape': shape,
+            'anchor': anchor
+        })
+
+    @staticmethod
     def create_in_range_action(color_space: str, lower_boundary: List[int],
                                upper_boundary: List[int]):
         return Action(ActionType.IN_RANGE, {
@@ -72,3 +88,5 @@ class ActionFactory(ABC):
             'lower_boundary': lower_boundary,
             'upper_boundary': upper_boundary
         })
+
+

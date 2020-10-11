@@ -29,6 +29,8 @@ class ActionProcessor:
             ActionType.EROSION: MorphologicalExActionStrategy(),
             ActionType.DILATION: MorphologicalExActionStrategy(),
             ActionType.MORPH_GRADIENT: MorphologicalExActionStrategy(),
+            ActionType.MORPH_OPENING: MorphologicalExActionStrategy(),
+            ActionType.MORPH_CLOSING: MorphologicalExActionStrategy(),
             ActionType.IN_RANGE: InRangeActionStrategy()
         }
 
@@ -77,6 +79,10 @@ class MorphologicalExActionStrategy(AbstractActionStrategy):
             morph_type = cv.MORPH_DILATE
         elif action.action_type == ActionType.MORPH_GRADIENT:
             morph_type = cv.MORPH_GRADIENT
+        elif action.action_type == ActionType.MORPH_OPENING:
+            morph_type = cv.MORPH_OPEN
+        elif action.action_type == ActionType.MORPH_CLOSING:
+            morph_type = cv.MORPH_CLOSE
         else:
             raise ValueError(f'Current strategy does not support action: {action.to_string()}')
 
