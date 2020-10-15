@@ -20,10 +20,11 @@ from PySide2.QtCore import Slot, Signal
 from PySide2.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QAction, QFileDialog, QLabel, \
     QDialog
 
-from cvisiontool.core.actions import Action
-from cvisiontool.core.aproc import ActionProcessor
+from cvisiontool.core.actions import Action, ActionFactory
+from cvisiontool.core.actionproc import ActionProcessor
+from cvisiontool.core.historymanager import HistoryManager, HistoryEntry
 from cvisiontool.gui.common import MatView, MatViewPosInfo
-from cvisiontool.gui.history import HistoryDialog, global_history_manager, HistoryEntry
+from cvisiontool.gui.history import HistoryDialog
 from cvisiontool.gui.transform import ErosionAndDilationDialog, InRangeDialog
 
 
@@ -34,6 +35,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.__action_processor = ActionProcessor()
         self.__lasted_chosen_dir = None
+        self.__history_manager = HistoryManager()
         self.__current_mat_bgr: np.ndarray = None
         self.__history_dialog: QDialog = None
         self.__current_dialog: QDialog = None
@@ -92,8 +94,10 @@ class MainWindow(QMainWindow):
             self.__current_mat_bgr = cv.imread(selected_file)
             self.__mat_view.render_bgr_mat(self.__current_mat_bgr)
             self.image_loaded.emit(self.__current_mat_bgr)
-            global_history_manager.add_entry(
-                HistoryEntry(f'Image loaded: {selected_file}', self.__current_mat_bgr))
+            self.__history_manager.add_entry(HistoryEntry(
+                ActionFactory.create_image_loaded_action(selected_file),
+                self.__current_mat_bgr
+            ))
             self.__activate_menu_on_image_load()
 
     @Slot()
@@ -102,7 +106,8 @@ class MainWindow(QMainWindow):
             if not self.__history_dialog.isVisible():
                 self.__history_dialog.show()
         else:
-            self.__history_dialog = HistoryDialog(self)
+            self.__history_dialog = HistoryDialog(self.__history_manager, self)
+            self.__history_dialog.apply_history_entry.connect(self.__on_apply_history_entry)
             self.__history_dialog.show()
 
     @Slot()
@@ -144,6 +149,7 @@ class MainWindow(QMainWindow):
     @Slot(Action)
     def apply_action_result(self, action: Action):
         self.__current_mat_bgr = self.__action_processor.process(action, self.__current_mat_bgr)
+        self.__history_manager.add_entry(HistoryEntry(action, self.__current_mat_bgr))
         self.__mat_view.render_bgr_mat(self.__current_mat_bgr)
 
     @Slot()
@@ -154,3 +160,9 @@ class MainWindow(QMainWindow):
         self.__current_dialog.display_action_result.connect(self.display_action_result)
         self.__current_dialog.apply_action_result.connect(self.apply_action_result)
         self.__current_dialog.discard_action_result.connect(self.discard_non_applied_changes)
+
+    @Slot(HistoryEntry)
+    def __on_apply_history_entry(self, entry: HistoryEntry):
+        if entry is not None and entry.mat_bgr is not None:
+            self.__current_mat_bgr = entry.mat_bgr
+            self.__mat_view.render_bgr_mat(self.__current_mat_bgr)

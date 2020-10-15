@@ -21,6 +21,7 @@ from typing import Dict, Any, List
 
 
 class ActionType(Enum):
+    IMAGE_LOADED = 'image_loaded'
     EROSION = 'erosion'
     DILATION = 'dilation'
     MORPH_GRADIENT = 'morphological_gradient'
@@ -45,6 +46,12 @@ class Action:
 
 
 class ActionFactory(ABC):
+    @staticmethod
+    def create_image_loaded_action(filepath: str) -> Action:
+        return Action(ActionType.IMAGE_LOADED, {
+            'filepath': filepath
+        })
+
     @staticmethod
     def create_erosion_action(shape: int, anchor: int) -> Action:
         return Action(ActionType.EROSION, {
@@ -88,5 +95,3 @@ class ActionFactory(ABC):
             'lower_boundary': lower_boundary,
             'upper_boundary': upper_boundary
         })
-
-
