@@ -13,8 +13,7 @@
 #  #
 #   You should have received a copy of the GNU General Public License
 #   along with this program.  If not, see <https://www.gnu.org/licenses/>.
-from dataclasses import dataclass
-from typing import Dict, Optional, Any, List
+from typing import Dict
 
 from PySide2.QtCore import Slot, Qt, QPoint, Signal
 from PySide2.QtWidgets import QDialog, QVBoxLayout, QListWidget, QMenu, QAction

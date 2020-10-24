@@ -31,7 +31,8 @@ class ActionProcessor:
             ActionType.MORPH_GRADIENT: MorphologicalExActionStrategy(),
             ActionType.MORPH_OPENING: MorphologicalExActionStrategy(),
             ActionType.MORPH_CLOSING: MorphologicalExActionStrategy(),
-            ActionType.IN_RANGE: InRangeActionStrategy()
+            ActionType.IN_RANGE: InRangeActionStrategy(),
+            ActionType.HOUGH_CIRCLE: HoughCircleStrategy()
         }
 
     def process(self, action: Action, mat_bgr: np.ndarray) -> np.ndarray:
@@ -128,3 +129,24 @@ class InRangeActionStrategy(AbstractActionStrategy):
 
         mat = cv.cvtColor(mat_bgr, self.__supported_color_spaces[color_space])
         return cv.inRange(mat, np.array(lower_boundary), np.array(upper_boundary))
+
+
+class HoughCircleStrategy(AbstractActionStrategy):
+    def process(self, action: Action, mat_bgr: np.ndarray) -> np.ndarray:
+        detected_circles: np.ndarray = cv.HoughCircles(mat_bgr,
+                                                       method=action.params['method'],
+                                                       dp=action.params['dp'],
+                                                       minDist=action.params['min_dist'],
+                                                       param1=action.params['param1'],
+                                                       param2=action.params['param2'],
+                                                       minRadius=action.params['min_radius'],
+                                                       maxRadius=action.params['max_radius'])
+        res_img = np.copy(mat_bgr)
+        if detected_circles is not None:
+            circles = np.round(detected_circles[0, :]).astype("int")
+            if len(circles) > 0:
+                res_img = cv.cvtColor(res_img, cv.COLOR_GRAY2BGR)
+            for (x, y, r) in circles:
+                cv.circle(res_img, (x, y), r, (0, 255, 255), 2)  # yellow in BGR
+
+        return res_img

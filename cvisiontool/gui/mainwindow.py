@@ -24,6 +24,7 @@ from cvisiontool.core.actions import Action, ActionFactory
 from cvisiontool.core.actionproc import ActionProcessor
 from cvisiontool.core.historymanager import HistoryManager, HistoryEntry
 from cvisiontool.gui.common import MatView, MatViewPosInfo
+from cvisiontool.gui.detect import HoughCircleDialog
 from cvisiontool.gui.history import HistoryDialog
 from cvisiontool.gui.transform import ErosionAndDilationDialog, InRangeDialog
 
@@ -69,6 +70,11 @@ class MainWindow(QMainWindow):
         history_action = QAction(text='History', parent=menu)
         history_action.triggered.connect(self.__show_history_dialog)
         view_menu.addAction(history_action)
+
+        detect_menu = menu.addMenu('Detect')
+        hough_circle_action = QAction(text='Hough Circle', parent=menu)
+        hough_circle_action.triggered.connect(self.__show_hough_circle_dialog)
+        detect_menu.addAction(hough_circle_action)
 
         self.__transform_menu = menu.addMenu('Transform')
         erosion_and_dilation_action = QAction(text='Erosion and Dilation', parent=menu)
@@ -127,6 +133,15 @@ class MainWindow(QMainWindow):
             self.__current_dialog.close()
 
         self.__current_dialog = InRangeDialog()
+        self.__connect_current_dialog()
+        self.__current_dialog.show()
+
+    @Slot()
+    def __show_hough_circle_dialog(self):
+        if self.__current_dialog is not None:
+            self.__current_dialog.close()
+
+        self.__current_dialog = HoughCircleDialog()
         self.__connect_current_dialog()
         self.__current_dialog.show()
 

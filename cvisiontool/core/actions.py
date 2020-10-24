@@ -28,6 +28,7 @@ class ActionType(Enum):
     MORPH_OPENING = 'morphological_opening'
     MORPH_CLOSING = 'morphological_closing'
     IN_RANGE = 'in_range'
+    HOUGH_CIRCLE = 'hough_circle'
 
 
 @dataclass(frozen=True)
@@ -94,4 +95,17 @@ class ActionFactory(ABC):
             'color_space': color_space,
             'lower_boundary': lower_boundary,
             'upper_boundary': upper_boundary
+        })
+
+    @staticmethod
+    def create_hough_circle_action(method: int, dp: float, min_dist: float, param1: float,
+                                   param2: float, min_radius: float, max_radius: float):
+        return Action(ActionType.HOUGH_CIRCLE, {
+            'method': method,
+            'dp': dp,
+            'min_dist': min_dist,
+            'param1': param1,
+            'param2': param2,
+            'min_radius': min_radius,
+            'max_radius': max_radius
         })

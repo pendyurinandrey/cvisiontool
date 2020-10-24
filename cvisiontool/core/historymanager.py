@@ -14,7 +14,7 @@
 #   You should have received a copy of the GNU General Public License
 #   along with this program.  If not, see <https://www.gnu.org/licenses/>.
 from dataclasses import dataclass
-from typing import Any, List, Optional, Dict
+from typing import Any, List, Optional
 
 import numpy as np
 from PySide2.QtCore import Signal, QObject
