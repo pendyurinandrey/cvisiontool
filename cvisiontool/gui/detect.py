@@ -17,7 +17,7 @@ from typing import Tuple
 
 from PySide2.QtCore import Slot
 from PySide2.QtWidgets import QWidget, QPushButton, QLineEdit, QVBoxLayout, QFormLayout, QLabel, \
-    QMessageBox
+    QMessageBox, QHBoxLayout
 
 from cvisiontool.core.actions import ActionFactory
 from cvisiontool.gui.common import AbstractMatActionDialog, ChooseOneOfWidget
@@ -29,14 +29,14 @@ class HoughCircleDialog(AbstractMatActionDialog):
 
     def _create_main_widget(self) -> QWidget:
         self.__main_widget = QWidget()
-        self.__main_layout = QVBoxLayout(self.__main_widget)
+        self.__layout = QVBoxLayout(self.__main_widget)
 
         self.__method_widget = ChooseOneOfWidget('Method', {
             cv.HOUGH_GRADIENT: 'HOUGH_GRADIENT',
             cv.HOUGH_GRADIENT_ALT: 'HOUGH_GRADIENT_ALT'
         }, checked_index=cv.HOUGH_GRADIENT_ALT)
 
-        self.__main_layout.addWidget(self.__method_widget)
+        self.__layout.addWidget(self.__method_widget)
 
         params_layout = QFormLayout()
         self.__dp_line_edit = QLineEdit()
@@ -52,11 +52,11 @@ class HoughCircleDialog(AbstractMatActionDialog):
         self.__max_radius_line_edit = QLineEdit()
         params_layout.addRow(QLabel('maxRadius'), self.__max_radius_line_edit)
 
-        self.__main_layout.addLayout(params_layout)
+        self.__layout.addLayout(params_layout)
 
         self.__detect_button = QPushButton('Detect')
         self.__detect_button.clicked.connect(self.__on_detect_button_clicked)
-        self.__main_layout.addWidget(self.__detect_button)
+        self.__layout.addWidget(self.__detect_button)
 
         return self.__main_widget
 
@@ -111,3 +111,26 @@ class HoughCircleDialog(AbstractMatActionDialog):
             return int(value), True
         except ValueError:
             return 0, False
+
+
+class FindContoursDialog(AbstractMatActionDialog):
+    def _create_main_widget(self) -> QWidget:
+        self.__main_widget = QWidget(self)
+        self.__layout = QHBoxLayout(self.__main_widget)
+        self.__mode_widget = ChooseOneOfWidget('Contour retrieval mode', {
+            cv.RETR_EXTERNAL: 'RETR_EXTERNAL',
+            cv.RETR_LIST: 'RETR_LIST',
+            cv.RETR_CCOMP: 'RETR_CCOMP',
+            cv.RETR_TREE: 'RETR_TREE',
+            cv.RETR_FLOODFILL: 'RETR_FLOODFILL'
+        }, checked_index=cv.RETR_TREE)
+        self.__layout.addWidget(self.__mode_widget)
+
+        self.__method_widget = ChooseOneOfWidget('Contour approximation method', {
+            cv.CHAIN_APPROX_NONE: 'CHAIN_APPROX_NONE',
+            cv.CHAIN_APPROX_SIMPLE: 'CHAIN_APPROX_SIMPLE',
+            cv.CHAIN_APPROX_TC89_L1: 'CHAIN_APPROX_TC89_L1',
+            cv.CHAIN_APPROX_TC89_KCOS: 'CHAIN_APPROX_TC89_KCOS'
+        }, checked_index=cv.CHAIN_APPROX_SIMPLE)
+
+        return self.__main_widget
